@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-This is an the script for the pilot study of Project 'ReapDopa', which study the down-regulation effect of
-cognitive appraisal toward intructed fear.
+This is an the script for the pilot study.
 
 Author      Date           log of changes
 =========   =============  ======================
 C-P. Hu     May 25, 2018.  Initial version
+C-p. Hu     Nov 12, 2018.  Revision after 1st participant.
 
 Input:
      Participant ID, age, gender
@@ -15,12 +15,11 @@ Output:
     ERdopa_Pilot_d1_block_sX_2018_XXXX.txt   # the log file for each block (rating)
     ERdopa_Pilot_d1_trial_sX_2018_XXXX.txt   # the log file for each trials (Markers)
 
-@author: Chuan-Peng Hu, PHD, Neuroimaging Center, Mainz
-@email: hcp4715 at gmail dot com
-
-Note: this script include sending trigger to digitimer and biopac, please make sure that digitimer is connected with the 
+Note: this script include sending trigger to digitimer and biopac, please make sure that digitimer is connected with the
 the Bio-pac
 
+@author: Chuan-Peng Hu, PhD, Neuroimaging Center, Mainz
+@email: hcp4715 at gmail dot com
 """
 # from __future__ import absolute_import, division
 import psychopy
@@ -51,7 +50,7 @@ def shutdown():
     core.quit()
 
 # get the current directory and change the cd
-#thisDir = os.path.dirname(os.path.realpath(__file__))
+# thisDir = os.path.dirname(os.path.realpath(__file__))
 _thisDir = os.getcwd()
 os.chdir(_thisDir)
 
@@ -60,13 +59,13 @@ expName = 'ERdopa_Pilot'  # This name will be part of the output file names.
 expInfo = {'session': '01', 'participantID': 's1', 'gender': '', 'age': ''}
 dlg = gui.DlgFromDict(dictionary=expInfo, title=expName)
 if dlg.OK == False:
-    core.quit()  # user pressed cancel
+    core.quit()                         # user pressed cancel
 expInfo['date']    = data.getDateStr()  # add a simple timestamp
 expInfo['expName'] = expName
 
-########################### Setup the Window ##########################
+########################### Setup the Window ###############################################################
 app = wx.App(False)
-display_width  = wx.GetDisplaySize()[0]   # get the width of the display, strange, it is 1536, instead of 1920
+display_width  = wx.GetDisplaySize()[0]  # get the width of the display, strange, it is 1536, instead of 1920
 display_height = wx.GetDisplaySize()[1]  # get the height of the display
 win = visual.Window(size=[display_width, display_height],   # size of the window, better not full screen when debuggging
                     fullscr=True,        # better False when debugging
@@ -98,7 +97,7 @@ trialFilename = _thisDir + os.sep + u'data/%s_%s_%s_%s_%s' % (expInfo['expName']
 
 # Write the header for the trial file.
 initLine = open(trialFilename,'w')
-curLine = ','.join(map(str,['Session','Block','blockType', 'trialOrd', 'shape', 'stimType', 'trig','waitTime']))
+curLine  = ','.join(map(str,['Session','Block','blockType', 'trialOrd', 'shape', 'stimType', 'trig','waitTime','startTime','endTime','ITI']))
 initLine.write(curLine)
 initLine.write('\n')
 initLine.close()
@@ -340,7 +339,7 @@ def csRatings(sessID,blockID,name, shape,blockType,randCond):
     resultRec.close()
 
 # function to run a mini-block
-def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond):
+def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond, T0):
     # present instruction for the mini block
     if minblocktype == 'R':
         blockType = 1
@@ -358,6 +357,7 @@ def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond):
     timer = core.Clock()
     timer.add(10)
     escDown = None
+
     while timer.getTime() < 0 and escDown is None:
         escDown = get_keypress()
         if escDown is not None:
@@ -396,28 +396,38 @@ def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond):
         print(int(max(grouped_L)[1]))
         if int(max(grouped_L)[1]) <= 2:
             break
-    # present target for 15 sec.
+    ### present target for 15 sec.
+
+    # define the ITI before the loop started
+    ITItemp = np.arange(5,10)                         # get the range
+    ITI = np.random.choice(ITItemp,len(trialList)-1)  # random choice in the range
+    np.random.shuffle(ITI)                            # suffle
+    ITI= np.append(ITI,0)                           # append the last element
+
+    # start the loop
     for ii in range(len(trialList)):
         curTr = trialList[ii]
         shape, shapeOri, stimType, trig = curTr
-        send_code(trig)                          # send triggers before start
+        send_code(trig)                            # send triggers before start
         print('trigger code: ',trig)
         win.flip()
-        waitTime = np.random.randint(4,14,size=1) # randomly choose a time for shoscks
+        waitTime = np.random.randint(4,14,size=1)  # randomly choose a time for shocks
         timer = core.Clock()
         timer.add(waitTime[0])
         escDown = None
+        T_c = core.getTime()                       #  get the time when trial started
+        T_s = T_c - T0
         while timer.getTime() < 0 and escDown is None:
             escDown = get_keypress()
             if escDown is not None:
                 shutdown()
-            shapePres([0,0],100,shapeOri)
+            shapePres([0,0],100,shapeOri,)
             showImage_c.draw()
             win.flip()
         print('waiting time: ',waitTime[0])
         send_shocks(trig)                          # send shocks after wait 4 ~ 14 seconds
         timer = core.Clock()
-        timer.add(15-waitTime[0]-5*0.25)           # Wait for the rest of the time.
+        timer.add(15 - waitTime[0]- 5*0.025)       # Wait for the rest of the time.
         escDown = None
         while timer.getTime() < 0 and escDown is None:
             escDown = get_keypress()
@@ -427,17 +437,19 @@ def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond):
             showImage_c.draw()
             win.flip()
         win.flip()
-        if ii < (len(trialList)-1):
-            ITI = np.random.randint(8,12,size=1)   # the interval between trials, 8 ~ 12
-            ITI = ITI[0]
-        else:
-            ITI = 0.5
+        T_c = core.getTime()                       # Get the current time
+        T_end = T_c - T0                           # Get the time when the trial ended
+        #if ii < (len(trialList)-1):
+        ITI_c = ITI[ii]                            # the interval between trials, 8 ~ 12 (ii start with 0, index start from 0)
+        #ITI = ITI[0]
+        #else:
+        #    ITI_c = 0.5                              # ITI for last trial of each mini-block
 
-        # present the fixation and wait for ITI
+        # present the fixation and wait for ITI_c
         imName = _thisDir + os.sep + 'stim' + os.sep + 'fixation.jpg'
         showImage = visual.ImageStim(win, image=imName,pos=[0, 0])
         timer = core.Clock()
-        timer.add(ITI)
+        timer.add(ITI_c)
         escDown = None
         while timer.getTime() < 0 and escDown is None:
             escDown = get_keypress()
@@ -454,8 +466,8 @@ def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond):
             stimCS = 1
         elif stimType == 'CS-':
             stimCS = 0
-        # ['Session','Block','blockType', 'trialOrd', 'shape', 'stimType', 'trig','waitTime']
-        curLine = ','.join(map(str,[sessID,blockID,blockType,ii+1,shape, stimCS, trig,waitTime[0]]))
+        # ['Session','Block','blockType', 'trialOrd', 'shape', 'stimType', 'trig','waitTime','startTime','endTime','ITI']
+        curLine = ','.join(map(str,[sessID,blockID,blockType,ii+1,shape, stimCS, trig,waitTime[0],T_s,T_end,ITI_c]))
         resultRec.write(curLine)
         resultRec.write('\n')
         resultRec.close()
@@ -486,12 +498,15 @@ def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond):
     cs2rating = csRatings(sessID,blockID,"ro_ratings",'ro',minblocktype,randCond)         # rating the ro
 
 # short break between blocks
-    if (sessID == 1 and blockID == 1) or (sessID > 1 and blockID < 3):
+    if (sessID == 1 and blockID == 1) or ( 4 > sessID > 1 and blockID < 3):   # within session rest: 10 seconds
         imName = _thisDir + os.sep + 'stim' + os.sep + 'pause_s.jpg'
-        waitDur = 10  # short break for the mini blocks within a session
-    else:
+        waitDur = 30                                                          # short break for the mini blocks within a session
+    elif (sessID == 1 and blockID == 2) or (sessID == 2 and blockID == 3):    # between session rest: 60 secons
         imName = _thisDir + os.sep + 'stim' + os.sep + 'pause_l.jpg'
-        waitDur = 120 # long breaks between blocks
+        waitDur = 60                                                          # long breaks between blocks
+    elif sessID == 3 and blockID == 3:                                        # End of the experiment
+        imName = _thisDir + os.sep + 'stim' + os.sep + 'fixation.jpg'
+        waitDur = 5
     showImage = visual.ImageStim(win, image=imName,pos=[0, 0])
     escDown = None
     timer = core.Clock()
@@ -542,9 +557,10 @@ win.flip()
 
 event.waitKeys(maxWait=20.0,keyList=['space']) # wait for participants' response to proceed
 
-twoShockId = random.choice([2,3]) # random choose a block for two shocks
+twoShockId = random.choice([2,3])              # random choose a block for two shocks
 
-send_code(1)   # start of the experiment, send two codes
+send_code(1)                                   # start of the experiment, send two codes
+T0 = core.getTime()                            # get the time of experiment started
 
 for ii in range(len(blocks)):
     SessID = ii + 1
@@ -569,7 +585,7 @@ for ii in range(len(blocks)):
             trials = [CSplus_1]*2+[CSplus_2]*3+[CSminus]*3
         else:
             trials = [CSplus_1]+[CSplus_2]*3+[CSminus]*3
-        run_block(SessID, blockID, curBlock,trials,trialFilename,randCond)
+        run_block(SessID, blockID, curBlock,trials,trialFilename,randCond, T0)
 
     # pause between blocks
     # if ii < len(blocks) -1:
@@ -586,6 +602,7 @@ for ii in range(len(blocks)):
     #        win.flip()       # present the instruction for resting
 
 # show thanks and goodbye
+send_code(1)                          # End of the experiment, send two codes
 text_msg("Vielen Dank", [0, 0],50)
 win.flip()
 core.wait(1)
