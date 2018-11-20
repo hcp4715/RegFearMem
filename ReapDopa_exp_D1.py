@@ -7,6 +7,7 @@ Author      Date           log of changes
 =========   =============  ======================
 C-P. Hu     May 25, 2018.  Initial version
 C-p. Hu     Nov 12, 2018.  Revision after 1st participant.
+C-P. Hu     Nov 20, 2018.  Re-structure the script (local v. global variables)
 
 Input:
      Participant ID, age, gender
@@ -36,18 +37,7 @@ from numpy.random import random, randint, normal, shuffle  # Note here that we u
 from itertools import groupby
 import random
 
-# define a function to get the ESCAPE key
-def get_keypress():
-    keys = event.getKeys(keyList=['escape'])
-    if keys:
-        return keys[0]
-    else:
-        return None
-
-# define a function to exit
-def shutdown():
-    win.close()
-    core.quit()
+##################################### Define global variables #########################################################
 
 # get the current directory and change the cd
 # thisDir = os.path.dirname(os.path.realpath(__file__))
@@ -55,7 +45,7 @@ _thisDir = os.getcwd()
 os.chdir(_thisDir)
 
 # get subject information before open windows
-expName = 'ERdopa_Pilot'  # This name will be part of the output file names.
+expName = 'ERdopa_Pilot_exp'  # This name will be part of the output file names.
 expInfo = {'session': '01', 'participantID': 's1', 'gender': '', 'age': ''}
 dlg = gui.DlgFromDict(dictionary=expInfo, title=expName)
 if dlg.OK == False:
@@ -107,7 +97,7 @@ blockFilename = _thisDir + os.sep + u'data/%s_%s_%s_%s_%s' % (expInfo['expName']
 
 # Write the header for the block file
 initLine = open(blockFilename,'w')
-curLine = ','.join(map(str,['Session','Block','ratingType', 'blockType', 'CS(1+0-)','Ratings', 'Rating_time']))
+curLine = ','.join(map(str,['Session','Block','ratingType', 'blockType', 'CSType','Ratings', 'Rating_time']))
 initLine.write(curLine)
 initLine.write('\n')
 initLine.close()
@@ -119,7 +109,40 @@ for k, v in reader:
    # k, v = row
    pseudorand[k] = v
 
-########################################## Triggers & Shocks ##########################################################
+# define block params.
+blocks = [['R','NR'],
+          ['NR','R','NR'],
+          ['R','NR','R']]
+# define trial params.
+# randomize the CS+, CS-.
+# randCond = np.random.choice([1,2],1)
+randCond = pseudorand[expInfo['participantID']]
+
+if randCond == '1':   # judge the condition
+    print('random order 1')
+    CSplus_1 = ['sq', 0,  'CS+', 2]  # CS+ with shocks
+    CSplus_2 = ['sq', 0,  'CS+', 3]  # CS+ without shocks
+    CSminus  = ['ro', 45, 'CS-', 4]  # CS-
+else:
+    print('random order 2')
+    CSplus_1 = ['ro', 45, 'CS+', 2] # CS+ with shock
+    CSplus_2 = ['ro', 45, 'CS+', 3]
+    CSminus  = ['sq', 0,  'CS-', 4]
+
+########################################## Define functions  ##########################################################
+### define a function to get the ESCAPE key
+def get_keypress():
+    keys = event.getKeys(keyList=['escape'])
+    if keys:
+        return keys[0]
+    else:
+        return None
+
+# define a function to exit
+def shutdown():
+    win.close()
+    core.quit()
+
 # Define function for sending the code
 # strange phenomenon in inpout32.py: Only pins 2-9 (incl) are normally used for data output
 def send_code(code):
@@ -128,15 +151,16 @@ def send_code(code):
     :return: the code that recognizable for our digitimer and bio-pac
     
     in behavioural lab 2, pin 2 is digitimer, pin 3 is channel 28, pin 4 is channel 29.
+    In behavioural lab 1, pin 2 is ....
     '''
     # set all the port to zero before the experiment start
     port = parallel.ParallelPort(0x0378)
     port.setData(0) # set all pins low
-    if code == 1:         # marker the start of block, both triggers are sent
+    if code == 1:         # marker the start and the end of block, both triggers are sent
         port.setPin(2, 0) # Send 0 to pin 2, i.e., no shcok
         port.setPin(3, 1) # Send 1 to pin 3 (channel 28), as marker
         port.setPin(4, 1) # Send 1 to pin 4 (channel 29), as marker
-        core.wait(0.03)
+        core.wait(0.025)
         port.setPin(2, 0) # pin 2 back to 0
         port.setPin(3, 0) # pin 3 back to 0
         port.setPin(4, 0) # pin 4 back to 0
@@ -144,7 +168,7 @@ def send_code(code):
         port.setPin(2, 0) # Send 0 to pin 2, i.e., no shcok
         port.setPin(3, 1) # Send 1 to pin 3, as marker
         port.setPin(4, 0) # Send 0 to pin 4, as marker
-        core.wait(0.03)
+        core.wait(0.025)
         port.setPin(2, 0) # pin 2 back to 0
         port.setPin(3, 0) # pin 3 back to 0
         port.setPin(4, 0) # pin 1 back to 0
@@ -152,7 +176,7 @@ def send_code(code):
         port.setPin(2, 0) # Send 0 to pin 2, i.e., no shcok
         port.setPin(3, 1) # Send 1 to pin 3, as marker
         port.setPin(4, 0) # Send 0 to pin 4, as marker
-        core.wait(0.03)
+        core.wait(0.025)
         port.setPin(2, 0) # pin 2 back to 0
         port.setPin(3, 0) # pin 3 back to 0
         port.setPin(4, 0) # pin 1 back to 0
@@ -160,7 +184,7 @@ def send_code(code):
         port.setPin(2, 0) # Send 1 to pin 2, i.e., no shcok
         port.setPin(3, 0) # Send 1 to pin 3, as marker
         port.setPin(4, 1) # Send 0 to pin 4, as marker
-        core.wait(0.03)
+        core.wait(0.025)
         port.setPin(2, 0) # pin 2 back to 0
         port.setPin(3, 0) # pin 3 back to 0
         port.setPin(4, 0) # pin 4 back to 0
@@ -237,7 +261,7 @@ def shapePres(loc,shapeSize,shapeOrient):
     curShape.draw()
     #win.flip()
 
-def erRatings(sessID,blockID,name):
+def erRatings(sessID,blockID,name,blockFile):
     ''' This is the function for rating the strategy
     '''
     curER_Rating = visual.RatingScale(win=win,
@@ -274,14 +298,15 @@ def erRatings(sessID,blockID,name):
     decision_time = curER_Rating.getRT()
 
     # write the rating
-    resultRec = open(blockFilename,'a+')
+    resultRec = open(blockFile,'a+')
+    # 'Session','Block','ratingType', 'blockType', 'CS(1+0-)','Ratings', 'Rating_time'
     curLine = ','.join(map(str,[sessID,blockID,'StrRating', 1,'NA',get_rating,decision_time]))
     resultRec.write(curLine)
     resultRec.write('\n')
     resultRec.close()
 
 # define a function for rating the shapes,
-def csRatings(sessID,blockID,name, shape,blockType,randCond):
+def csRatings(sessID,blockID,blockFile,name, shape,blockType,randCond):
     ''' This is the function for rating their feelings about shapes
     '''
     curRating = visual.RatingScale(win=win,
@@ -331,7 +356,7 @@ def csRatings(sessID,blockID,name, shape,blockType,randCond):
         blockTypeCode = 1
     else:
         blockTypeCode = 0
-    resultRec = open(blockFilename,'a+')
+    resultRec = open(blockFile,'a+')
     # ['Session','Block','ratingType', 'blockType', 'CS(1+0-)','Ratings', 'Rating_time']
     curLine = ','.join(map(str,[sessID,blockID,'AnxRating', blockTypeCode, CStype,cs_get_rating,cs_decision_time]))
     resultRec.write(curLine)
@@ -339,7 +364,7 @@ def csRatings(sessID,blockID,name, shape,blockType,randCond):
     resultRec.close()
 
 # function to run a mini-block
-def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond, T0):
+def run_block(sessID,block,minblocktype,trialList,trialFile,blockFile,Cond, startTime):
     # present instruction for the mini block
     if minblocktype == 'R':
         blockType = 1
@@ -416,7 +441,7 @@ def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond, T0):
         timer.add(waitTime[0])
         escDown = None
         T_c = core.getTime()                       #  get the time when trial started
-        T_s = T_c - T0
+        T_s = T_c - startTime
         while timer.getTime() < 0 and escDown is None:
             escDown = get_keypress()
             if escDown is not None:
@@ -438,7 +463,7 @@ def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond, T0):
             win.flip()
         win.flip()
         T_c = core.getTime()                       # Get the current time
-        T_end = T_c - T0                           # Get the time when the trial ended
+        T_end = T_c - startTime                           # Get the time when the trial ended
         #if ii < (len(trialList)-1):
         ITI_c = ITI[ii]                            # the interval between trials, 8 ~ 12 (ii start with 0, index start from 0)
         #ITI = ITI[0]
@@ -492,10 +517,10 @@ def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond, T0):
             showImage.draw()
             win.flip()
 
-        erRating = erRatings(sessID,blockID,"str_ratings")   # rating the strategy
+        erRating = erRatings(sessID,blockID,"str_ratings",blockFile)   # rating the strategy
 
-    cs1Rating = csRatings(sessID,blockID,"sq_ratings",'sq',minblocktype,randCond)         # rating the shape square
-    cs2rating = csRatings(sessID,blockID,"ro_ratings",'ro',minblocktype,randCond)         # rating the ro
+    cs1Rating = csRatings(sessID,block,blockFile,"sq_ratings",'sq',minblocktype,Cond)         # rating the shape square
+    cs2rating = csRatings(sessID,block,blockFile,"ro_ratings",'ro',minblocktype,Cond)         # rating the ro
 
 # short break between blocks
     if (sessID == 1 and blockID == 1) or ( 4 > sessID > 1 and blockID < 3):   # within session rest: 10 seconds
@@ -519,26 +544,6 @@ def run_block(sessID,blockID,minblocktype,trialList,trialFile,randCond, T0):
         win.flip()       # present the instruction for resting
 
 ################################# The Real experiemnt starts here ##################################################
-# define block params.
-blocks = [['R','NR'],
-          ['NR','R','NR'],
-          ['R','NR','R']]
-# define trial params.
-# randomize the CS+, CS-.
-# randCond = np.random.choice([1,2],1)
-randCond = pseudorand[expInfo['participantID']]
-
-if randCond == '1':   # judge the condition
-    print('random order 1')
-    CSplus_1 = ['sq', 0,  'CS+', 2]  # CS+ with shocks
-    CSplus_2 = ['sq', 0,  'CS+', 3]  # CS+ without shocks
-    CSminus  = ['ro', 45, 'CS-', 4]  # CS-
-else:
-    print('random roder 2')
-    CSplus_1 = ['ro', 45, 'CS+', 2] # CS+ with shock
-    CSplus_2 = ['ro', 45, 'CS+', 3]
-    CSminus  = ['sq', 0,  'CS-', 4]
-
 # show the instructions
 text_msg("Das Experiment beginnt jetzt.", (0, 0),30)
 win.flip()
@@ -585,7 +590,7 @@ for ii in range(len(blocks)):
             trials = [CSplus_1]*2+[CSplus_2]*3+[CSminus]*3
         else:
             trials = [CSplus_1]+[CSplus_2]*3+[CSminus]*3
-        run_block(SessID, blockID, curBlock,trials,trialFilename,randCond, T0)
+        run_block(SessID, blockID, curBlock,trials,trialFilename,blockFilename,randCond, T0)
 
     # pause between blocks
     # if ii < len(blocks) -1:
