@@ -53,12 +53,12 @@ if dlg.OK == False:
 expInfo['date']    = data.getDateStr()  # add a simple timestamp
 expInfo['expName'] = expName
 
-########################### Setup the Window ###############################################################
+###################################### Setup the Window ###############################################################
 app = wx.App(False)
 display_width  = wx.GetDisplaySize()[0]  # get the width of the display, strange, it is 1536, instead of 1920
 display_height = wx.GetDisplaySize()[1]  # get the height of the display
-win = visual.Window(size=[display_width, display_height],   # size of the window, better not full screen when debuggging
-                    fullscr=True,        # better False when debugging
+win = visual.Window(size=[800, 600],   # size of the window, better not full screen when debuggging
+                    fullscr=False,        # better False when debugging
                     screen=0,            # chose the default monitor
                     allowGUI=True,
                     allowStencil=False,
@@ -83,7 +83,7 @@ if not os.path.exists('data'):
 
 # Data file name stem = absolute path + name; later add .psyexp, .csv, .log, etc
 # define the file name for recording each trial.
-trialFilename = _thisDir + os.sep + u'data/%s_%s_%s_%s_%s' % (expInfo['expName'], 'd1_trial',expInfo['participantID'],expInfo['date'],'.txt')
+trialFilename = _thisDir + os.sep + u'data/%s_%s_%s_%s%s' % (expInfo['expName'], 'd1_trial',expInfo['participantID'],expInfo['date'],'.txt')
 
 # Write the header for the trial file.
 initLine = open(trialFilename,'w')
@@ -93,7 +93,7 @@ initLine.write('\n')
 initLine.close()
 
 # Define the file name for logging for block.
-blockFilename = _thisDir + os.sep + u'data/%s_%s_%s_%s_%s' % (expInfo['expName'], 'd1_block',expInfo['participantID'],expInfo['date'],'.txt')
+blockFilename = _thisDir + os.sep + u'data/%s_%s_%s_%s%s' % (expInfo['expName'], 'd1_block',expInfo['participantID'],expInfo['date'],'.txt')
 
 # Write the header for the block file
 initLine = open(blockFilename,'w')
