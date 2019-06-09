@@ -1,18 +1,26 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-This is an the script for the pilot study of Project 'ReapDopa', which study the effect
+This is an the script for the pilot study (two-day).
 
-Created on Fri. May 25, 2018.
+Author      Date           log of changes
+=========   =============  ======================
+C-P. Hu     Jan 23, 2019.  revision to change details
 
-@author: Chuan-Peng Hu, PHD, Neuroimaging Center, Mainz
+Input:
+     Participant ID, age, gender
+
+Output:
+    ERdopa_Pilot_d2_block_sX_2018_XXXX.txt   # the log file for each block (rating)
+    ERdopa_Pilot_d2_trial_sX_2018_XXXX.txt   # the log file for each trials (Markers)
+
+Note: this script include sending trigger to digitimer and biopac, please make sure that digitimer is connected with the
+the Bio-pac
+
+@author: Chuan-Peng Hu, PhD, Neuroimaging Center, Mainz
 @email: hcp4715 at gmail dot com
-
-Note: this script used for the task of the second day, in which only stimuli presented.
-Participants will view 20 CS stimuli (geometric shapes) and rate at the end of each block
-
 """
-# from __future__ import absolute_import, division
+
 import psychopy
 import wx, os, time, sys,csv
 from psychopy import parallel, locale_setup, sound, gui, visual, core, data, event, logging, clock
@@ -25,7 +33,97 @@ from numpy.random import random, randint, normal, shuffle  # Note here that we u
 import random
 from itertools import groupby
 
-# define a function to get key
+##################################### Define global variables #########################################################
+# get the current directory and change the cd
+# thisDir = os.path.dirname(os.path.realpath(__file__))
+_thisDir = os.getcwd()
+os.chdir(_thisDir)
+
+# get subject information before open windows
+expName = 'ERdopa_Pilot_exp'  # This name will be part of the output file names.
+expInfo = {'session': '01', 'participantID': 's1', 'gender': '', 'age': ''}
+dlg = gui.DlgFromDict(dictionary=expInfo, title=expName)
+if dlg.OK == False:
+    core.quit()                         # user pressed cancel
+expInfo['date']    = data.getDateStr()  # add a simple timestamp
+expInfo['expName'] = expName
+
+###################################### Setup the Window ###############################################################
+app = wx.App(False)
+display_width  = wx.GetDisplaySize()[0]  # get the width of the display, strange, it is 1536, instead of 1920
+display_height = wx.GetDisplaySize()[1]  # get the height of the display
+win = visual.Window(size=[800, 600],   # size of the window, better not full screen when debuggging
+                    fullscr=False,        # better False when debugging
+                    screen=0,            # chose the default monitor
+                    allowGUI=True,
+                    allowStencil=False,
+                    monitor='testMonitor',
+                    color=[0,0,0],       # mind the colorSpace
+                    colorSpace='rgb',    # chose the colorSpace and change accordingly
+                    blendMode='avg',
+                    useFBO=True,
+                    units='pix')         # important about the units, change the value for defining it accordingly
+
+win.mouseVisible = False # hide the mouse
+
+###################################### define constants ####################################################
+black = [-1, -1, -1]
+white = [1, 1, 1]
+grey  = [0, 0, 0]
+
+##################################### Define the data file ###################################################
+# create a folder called "data" if not exits, and change directory to the folder
+if not os.path.exists('data'):
+    os.mkdir('data')
+
+# Data file name stem = absolute path + name; later add .psyexp, .csv, .log, etc
+# define the file name for recording each trial.
+trialFilename = _thisDir + os.sep + u'data/%s_%s_%s_%s%s' % (expInfo['expName'], 'd2_trial',expInfo['participantID'],expInfo['date'],'.txt')
+
+# Write the header for the trial file.
+initLine = open(trialFilename,'w')
+curLine  = ','.join(map(str,['Session','Block','blockType', 'trialOrd', 'shape', 'stimType', 'trig','waitTime','startTime','endTime','ITI']))
+initLine.write(curLine)
+initLine.write('\n')
+initLine.close()
+
+# Define the file name for logging for block.
+blockFilename = _thisDir + os.sep + u'data/%s_%s_%s_%s%s' % (expInfo['expName'], 'd2_block',expInfo['participantID'],expInfo['date'],'.txt')
+
+# Write the header for the block file
+initLine = open(blockFilename,'w')
+curLine = ','.join(map(str,['Session','Block','ratingType', 'blockType', 'CSType','Ratings', 'Rating_time']))
+initLine.write(curLine)
+initLine.write('\n')
+initLine.close()
+
+######################### Prepare the pseudoraondom list of stimuli between participants ##################
+reader = csv.reader(open('pseudOrd_d2.csv', 'r'))
+pseudorand = {}
+for k, v in reader:
+   # k, v = row
+   pseudorand[k] = v
+
+# define block params.
+blocks = [['NR','NR','NR']]
+# define trial params.
+# randomize the CS+, CS- based on pseudo random order
+randCond = pseudorand[expInfo['participantID']]
+if randCond == '1':   # judge the condition
+    print('random order 1')
+#              shape, orient, stimType, trigger
+    CSplus_1 = ['ci', 1,  'CS+', 2] # CS+ with shocks
+    CSplus_2 = ['ci', 1,  'CS+', 3]
+    CSminus  = ['tr', 0, 'CS-', 4]
+else:
+    print('random order 2')
+#    trials = [['ro', 45,  'CS+', 2],
+    CSminus =  ['ci', 1, 'CS-', 4]
+    CSplus_1 = ['tr', 0, 'CS+', 2] # CS+ with shocks
+    CSplus_2 = ['tr', 0, 'CS+', 3]
+
+########################################## Define functions  ##########################################################
+### define a function to get the ESCAPE key
 def get_keypress():
     keys = event.getKeys(keyList=['escape'])
     if keys:
@@ -38,106 +136,49 @@ def shutdown():
     win.close()
     core.quit()
 
-# get the current directory and change the cd
-_thisDir = os.path.dirname(os.path.abspath(__file__))
-os.chdir(_thisDir)
 
-# get subject information before open windows
-expName = 'reapp_consolid_d2'  # from the Builder filename that created this script
-expInfo = {'session': '01', 'participantID': 's1', 'gender': '', 'age': ''}
-dlg = gui.DlgFromDict(dictionary=expInfo, title=expName)
-if dlg.OK == False:
-    core.quit()  # user pressed cancel
-expInfo['date'] = data.getDateStr()  # add a simple timestamp
-expInfo['expName'] = expName
-
-# Setup the Window
-app = wx.App(False)
-display_width = wx.GetDisplaySize()[0]   # get the width of the display
-display_height = wx.GetDisplaySize()[1]  # get the height of the display
-win = visual.Window(size=[800, 600],     # size of the window, better not full screen when debuggging
-                    fullscr=False,       # better False
-                    screen=0,
-                    allowGUI=True,
-                    allowStencil=False,
-                    monitor='testMonitor',
-                    color=[0,0,0],       # mind the colorSpace
-                    colorSpace='rgb',    # chose the colorSpace and change accordingly
-                    blendMode='avg',
-                    useFBO=True,
-                    units='pix')         # important about the units, change the value for defining it accordingly
-
-win.mouseVisible = False # hide the mouse
-# define constants
-black = [-1, -1, -1]
-white = [1, 1, 1]
-grey  = [0, 0, 0]
-
-# to go the data folder
-if not os.path.exists('data'):os.mkdir('data')
-
-# Data file name stem = absolute path + name; later add .psyexp, .csv, .log, etc
-trialFilename = _thisDir + os.sep + u'data/%s_%s_%s' % (expInfo['participantID'],expInfo['date'],'_trial_d2.txt')
-initLine = open(trialFilename,'w')
-curLine = ','.join(map(str,['Block','trialOrd', 'shape', 'shapeOri', 'stimType','trig','waitTime']))
-initLine.write(curLine)
-initLine.write('\n')
-initLine.close()
-
-blockFilename = _thisDir + os.sep + u'data/%s_%s_%s' % (expInfo['participantID'],expInfo['date'],'_block_d2.txt')
-initLine = open(blockFilename,'w')
-curLine = ','.join(map(str,['Block','RatingType', 'Target', 'Ratings', 'Rating_time']))
-initLine.write(curLine)
-initLine.write('\n')
-initLine.close()
-
-# pseudoraondom list
-reader = csv.reader(open('pseudOrd_d2.csv', 'r'))
-pseudorand = {}
-for k, v in reader:
-   # k, v = row
-   pseudorand[k] = v
-
+# Define function for sending the code
 # strange phenomenon in inpout32.py: Only pins 2-9 (incl) are normally used for data output
 def send_code(code):
     '''    This is a function for sending trigger to our parallel port
     :param code: code number
     :return: the code that recognizable for our digitimer and bio-pac
-
+    
     in behavioural lab 2, pin 2 is digitimer, pin 3 is channel 28, pin 4 is channel 29.
+    In behavioural lab 1, pin 2 is ....
     '''
-    # set all the port to zero befor the experiment start
+    # set all the port to zero before the experiment start
     port = parallel.ParallelPort(0x0378)
     port.setData(0) # set all pins low
-    if code == 1:         # marker the start of block
+    if code == 1:         # marker the start and the end of block, both triggers are sent
         port.setPin(2, 0) # Send 0 to pin 2, i.e., no shcok
         port.setPin(3, 1) # Send 1 to pin 3 (channel 28), as marker
         port.setPin(4, 1) # Send 1 to pin 4 (channel 29), as marker
-        core.wait(0.03)
+        core.wait(0.025)
         port.setPin(2, 0) # pin 2 back to 0
         port.setPin(3, 0) # pin 3 back to 0
         port.setPin(4, 0) # pin 4 back to 0
-    elif code == 3:  # CS+
+    elif code == 3:       # CS+
         port.setPin(2, 0) # Send 0 to pin 2, i.e., no shcok
         port.setPin(3, 1) # Send 1 to pin 3, as marker
         port.setPin(4, 0) # Send 0 to pin 4, as marker
-        core.wait(0.03)
+        core.wait(0.025)
         port.setPin(2, 0) # pin 2 back to 0
         port.setPin(3, 0) # pin 3 back to 0
         port.setPin(4, 0) # pin 1 back to 0
-    elif code == 2:  # CS+
+    elif code == 2:       # CS+ with shocks
         port.setPin(2, 0) # Send 0 to pin 2, i.e., no shcok
         port.setPin(3, 1) # Send 1 to pin 3, as marker
         port.setPin(4, 0) # Send 0 to pin 4, as marker
-        core.wait(0.03)
+        core.wait(0.025)
         port.setPin(2, 0) # pin 2 back to 0
         port.setPin(3, 0) # pin 3 back to 0
         port.setPin(4, 0) # pin 1 back to 0
-    elif code == 4:         # CS-
+    elif code == 4:       # CS-
         port.setPin(2, 0) # Send 1 to pin 2, i.e., no shcok
         port.setPin(3, 0) # Send 1 to pin 3, as marker
         port.setPin(4, 1) # Send 0 to pin 4, as marker
-        core.wait(0.03)
+        core.wait(0.025)
         port.setPin(2, 0) # pin 2 back to 0
         port.setPin(3, 0) # pin 3 back to 0
         port.setPin(4, 0) # pin 4 back to 0
@@ -156,11 +197,13 @@ def send_shocks(code):
         print("shock 1")
         core.wait(0.025)
         port.setPin(2, 0) # pin 2 back to 0
+
         core.wait(0.025)
         port.setPin(2, 1) # Send 1 to pin 2, i.e., shcok
         print("shock 2")
         core.wait(0.025)
         port.setPin(2, 0) # pin 2 back to 0
+
         core.wait(0.025)
         port.setPin(2, 1) # Send 1 to pin 2, i.e., shcok
         print("shock 3")
@@ -189,90 +232,49 @@ def text_msg(msg,loc,fontheight):
     #win.flip()
 
 # define a function for presenting geometrical shapes, three input params: location, size and orientation.
-def shapePres(loc,shapeSize,shapeOrient):
+def shapePres(shapeName,loc,shapeSize,shapeOrient):
     ''' display a short text message
     for a fixed duration
     '''
-    if shapeOrient == 1:
-        curShape = visual.Circle(win, radius=shapeSize*0.6, edges=32,
-                                 lineColor=black, lineColorSpace='rgb',
-                                 fillColor=black,fillColorSpace='rgb',
-                                 pos=loc,lineWidth=1.5)
-    else:
+    if shapeName == 'tr':
+        shapeSize = shapeSize * 2
         curShape = visual.ShapeStim(win,
-                                    units='pix',
-                                    lineWidth=1.5,                                           # width of outline
-                                    lineColor=black, lineColorSpace='rgb',                   # color of outline
-                                    fillColor=black,fillColorSpace='rgb',                    # color of fill
-                                    vertices=((-0.5,-0.5),(0.5,-0.5),(0,0.5)),               # the three points of the shape
-                                    size=shapeSize*1.2,                                          # size of the shape, units=pixel
-                                    pos= loc,                                                # position of the shape
-                                    ori=shapeOrient,                                         # orientation of the shape
-                                    opacity=1,
-                                    contrast=1.0,
-                                    depth=1.0,
-                                    interpolate=True,
-                                    autoLog=None,
-                                    autoDraw=False)
+                        units='pix',
+                        lineWidth=1.5,                                           # width of outline
+                        lineColor=black, lineColorSpace='rgb',                   # color of outline
+                        fillColor=black,fillColorSpace='rgb',                    # color of fill
+                        vertices=((-0.5,-0.5),(0.5,-0.5),(0,0.5)),               # the four point of the shape
+                        size=shapeSize,                                          # size of the shape, units=pixel
+                        pos= loc,                                                # position of the shape
+                        ori=shapeOrient,                                         # orientation of the shape in degree
+                        opacity=1,
+                        contrast=1.0,
+                        depth=1.0,
+                        interpolate=True,
+                        autoLog=None,
+                        autoDraw=False)
+    else:
+        curShape = visual.Circle(win, pos = loc, radius = shapeSize,
+                                 units = 'pix', lineWidth=1.5,                                           # width of outline
+                                 lineColor=black, lineColorSpace='rgb',                   # color of outline
+                                 fillColor=black,fillColorSpace='rgb')                  # color of fill)
+                                 
     curShape.draw()
     #win.flip()
-
-def erRatings(blockID,name, blockType):
-    ''' This is the function for rating the strategy
-    '''
-    curER_Rating = visual.RatingScale(win=win,
-                                   low = 0,
-                                   high = 100,
-                                   precision=3,
-                                   #tickMarks=(0,100),       # the location of tick marker
-                                   tickHeight=1,          # suppress the ticker
-                                   markerStart=np.random.choice(np.arange(3.0,7.0,0.1),1),
-                                   scale = None,
-                                   labels = ('nicht erfolgreich', 'erfolgreich'),
-                                   stretch = 1.5,
-                                   pos=(0.0, -100),          # this is the default setting
-                                   leftKeys=['1', 'left'],   # keys for moving left
-                                   rightKeys=['2', 'right'], # keys for moving right
-                                   acceptKeys=['3','return'],# keys for accept the ratings
-                                   noMouse=True,
-                                   showValue=False,          # param for showing value or not
-                                   name=name)                # the name for current rating
-    curER_Rating.slidingInterval = 0.1
-    escDown = None
-    while curER_Rating.noResponse and escDown is None:
-        escDown = get_keypress()
-        if escDown is not None:
-            shutdown()
-        # prepare the instruction for rating emotion regulation strategy
-        imName = _thisDir + os.sep + 'stim' + os.sep + 'rating_strag.jpg'
-        showImage = visual.ImageStim(win, image=imName,pos=[0, 100])
-        showImage.draw()
-        # prepare the scale
-        curER_Rating.draw()
-        win.flip()
-    get_rating    = curER_Rating.getRating()
-    decision_time = curER_Rating.getRT()
-
-    # write the rating
-    resultRec = open(blockFilename,'a+')
-    curLine = ','.join(map(str,[blockID,'strategyRating', blockType,get_rating,decision_time]))
-    resultRec.write(curLine)
-    resultRec.write('\n')
-    resultRec.close()
-
+    
 # define a function for rating the shapes,
-def csRatings(blockID,name, shape):
+def csRatings(sessID,blockID,blockFile,name, shape,blockType,randCond):
     ''' This is the function for rating their feelings about shapes
     '''
     curRating = visual.RatingScale(win=win,
                                    low = 0,
                                    high = 100,
                                    precision=3,
-                                   #tickMarks=(0,100),       # the location of tick marker
+                                   #tickMarks=(0,100),      # the location of tick marker
                                    tickHeight=1,            # suppress the ticker
                                    markerStart=np.random.choice(np.arange(3.0,7.0,0.1),1),
                                    scale = None,
-                                   labels = ('niedrig', 'hoch'),
+                                   labels = ('sehr niedrig', 'sehr hoch'),
                                    stretch = 1.5,
                                    pos=(0.0, -150),          # this is the default setting
                                    leftKeys=['1', 'left'],   # keys for moving left
@@ -284,30 +286,69 @@ def csRatings(blockID,name, shape):
     curRating.slidingInterval = 0.1
     escDown = None
     while curRating.noResponse and escDown is None:
+        escDown = get_keypress()
+        if escDown is not None:
+            shutdown()
+        # prepare the instruction for rating emotion regulation strategy
         imName = _thisDir + os.sep + 'stim' + os.sep + 'rating_shape.jpg'
         showImage = visual.ImageStim(win, image=imName,pos=[0, 150])
         showImage.draw()
-        if shape == "ci":   # if the shape is square
-            shapePres([0, 0], 100,1)
-        else:               # if the shape is rho
-            shapePres([0, 0], 100, 0)
-
+        if shape == "ci":   # if the shape is circle
+            shapePres(shape,[0, 0], 75,0)
+        else:               # if the shape is triangle
+            shapePres(shape,[0, 0], 90, 0)
         curRating.draw()
         win.flip()
-    cs_get_rating = curRating.getRating()
+    cs_get_rating    = curRating.getRating()
     cs_decision_time = curRating.getRT()
+  # write the rating
+    # recode the CS+ and CS-
+    if (randCond == '1' and shape == 'ci') | (randCond == '2' and shape == 'tr'):
+        CStype = 1    # define the CS+
+    elif (randCond == '1' and shape == 'tr') | (randCond == '2' and shape == 'ci'):
+        CStype = 0    # define the CS-
 
-    # write the rating
-    resultRec = open(blockFilename,'a+')
-    curLine = ','.join(map(str,[blockID,'AnxRating', shape,cs_get_rating,cs_decision_time]))
+    if blockType == 'R':
+        blockTypeCode = 1
+    else:
+        blockTypeCode = 0
+    resultRec = open(blockFile,'a+')
+    # ['Session','Block','ratingType', 'blockType', 'CS(1+0-)','Ratings', 'Rating_time']
+    curLine = ','.join(map(str,[sessID,blockID,'AnxRating', blockTypeCode, CStype,cs_get_rating,cs_decision_time]))
     resultRec.write(curLine)
     resultRec.write('\n')
     resultRec.close()
 
 # function to run a mini-block
-def run_block(blockID,trialList,trialFile):
+def run_block(sessID,block,blockType,trialList,trialFile,blockFile,Cond, startTime):
+    # present instruction for the mini block
+    #if minblocktype == 'R':
+    #    blockType = 1
+    #    imName = _thisDir + os.sep + 'stim' + os.sep + 'Reg.jpg'
+    #    imName_c = _thisDir + os.sep + 'stim' + os.sep + 'Reg_s.jpg'
+    #    InstrCont = 'regulation'
+    #else:
+    #    blockType = 0
+    #    imName = _thisDir + os.sep + 'stim' + os.sep + 'NoReg.jpg'
+    #    #imName_c = _thisDir + os.sep + 'stim' + os.sep + 'NoReg_s.jpg'
+        #InstrCont = 'NoRegulation'
+    # showImage = visual.ImageStim(win, image=imName,pos=[0, 0])
+    #showImage_c = visual.ImageStim(win, image=imName_c,pos=[0, -400]) # keep showing the cure under the lower part of the screeen
+    # present the the instruction for 10 s
+    timer = core.Clock()
+    #timer.add(10)
+    #escDown = None
 
-    # present the fixation for 10 s
+    #while timer.getTime() < 0 and escDown is None:
+    #    escDown = get_keypress()
+    #    if escDown is not None:
+    #        shutdown()
+    #    showImage.draw()
+        #showImage_c.draw()
+    #    win.flip()
+    # win.flip()
+
+    # present fixation for 30 secs
     imName = _thisDir + os.sep + 'stim' + os.sep + 'fixation.jpg'
     showImage = visual.ImageStim(win, image=imName,pos=[0, 0])
     timer = core.Clock()
@@ -318,74 +359,95 @@ def run_block(blockID,trialList,trialFile):
         if escDown is not None:
             shutdown()
         showImage.draw()
+        #showImage_c.draw()
         win.flip()
 
     # shuffle the trial list, re-shuffle when more then 3 repetitions
-    tmp = ['0','1','2','3','4']  # get a temporary list for storing the shuffled trial list
+    if len(trialList) == 8:
+        tmp = ['0','1','2','3','4','5','6','7','8']      # get a temporary list for storing the shuffled trial list
+    else:
+        tmp = ['0','1','2','3','4','5','6','7','8','9']  # get a temporary list for storing the shuffled trial list
     while True:
-        np.random.shuffle(trialList)  # randomizing the trials
+        np.random.shuffle(trialList)             # randomizing the trials
         for ii in (range(len(trialList))):
             tmp[ii] = (trialList[ii][0])
         grouped_L = [(k, sum(1 for i in g)) for k,g in groupby(tmp)]
         int(max(grouped_L)[1])
         print(int(max(grouped_L)[1]))
-        if int(max(grouped_L)[1]) <= 3: # less than or equal 3 consecutive same trial type.
+        if int(max(grouped_L)[1]) <= 3:
             break
-    # present target for 15 sec.
+
+    ### present target for 15 sec.
+    # define the ITI before the loop started
+    ITItemp = np.arange(5,10)                         # get the range
+    ITI = np.random.choice(ITItemp,len(trialList)-1)  # random choice in the range
+    np.random.shuffle(ITI)                            # suffle
+    ITI= np.append(ITI,0)                           # append the last element
+
+    # start the loop
     for ii in range(len(trialList)):
         curTr = trialList[ii]
         shape, shapeOri, stimType, trig = curTr
-        shapePres([0,0],100,shapeOri)
-        send_code(trig)              # send triggers before start
+        send_code(trig)                            # send triggers before start
         print('trigger code: ',trig)
         win.flip()
-        waitTime = np.random.randint(3,14,size=1) # randomly choose a time for shocks
+        waitTime = np.random.randint(4,14,size=1)  # randomly choose a time for shocks
         timer = core.Clock()
         timer.add(waitTime[0])
         escDown = None
+        T_c = core.getTime()                       #  get the time when trial started
+        T_s = T_c - startTime
         while timer.getTime() < 0 and escDown is None:
             escDown = get_keypress()
             if escDown is not None:
                 shutdown()
-            shapePres([0,0],100,shapeOri)
+            shapePres(shape,[0,0],75,shapeOri,)
+            #showImage_c.draw()
             win.flip()
         print('waiting time: ',waitTime[0])
-        #core.wait(waitTime)                       # wait for the duration of shape presenting (14.1 s)
-        send_shocks(trig)                         # send shocks at the end of the stimuli presentation
-
-        # presenting the stimulus for the remaining time
+        send_shocks(trig)                          # send shocks after wait 4 ~ 14 seconds
         timer = core.Clock()
-        timer.add(15-waitTime[0]-5*0.25)
+        timer.add(15 - waitTime[0]- 5*0.025)       # Wait for the rest of the time.
         escDown = None
         while timer.getTime() < 0 and escDown is None:
             escDown = get_keypress()
             if escDown is not None:
                 shutdown()
-            shapePres([0,0],100,shapeOri)
+            shapePres(shape,[0,0],75,shapeOri)
+            #showImage_c.draw()
             win.flip()
         win.flip()
+        T_c = core.getTime()                       # Get the current time
+        T_end = T_c - startTime                           # Get the time when the trial ended
+        #if ii < (len(trialList)-1):
+        ITI_c = ITI[ii]                            # the interval between trials, 8 ~ 12 (ii start with 0, index start from 0)
+        #ITI = ITI[0]
+        #else:
+        #    ITI_c = 0.5                              # ITI for last trial of each mini-block
 
-        if ii < 5:
-            ITI = np.random.randint(4,8,size=1)   # the interval between trials, 4 ~ 8
-            ITI = ITI[0]
-        else:
-            ITI = 0.5
-        # presenting fixation for ITI seconds
+        # present the fixation and wait for ITI_c
         imName = _thisDir + os.sep + 'stim' + os.sep + 'fixation.jpg'
         showImage = visual.ImageStim(win, image=imName,pos=[0, 0])
         timer = core.Clock()
-        timer.add(ITI)
+        timer.add(ITI_c)
         escDown = None
         while timer.getTime() < 0 and escDown is None:
             escDown = get_keypress()
             if escDown is not None:
                 shutdown()
             showImage.draw()
+            #showImage_c.draw()
             win.flip()
 
-        # write the rating
+        # write the trial information
         resultRec = open(trialFile,'a+')
-        curLine = ','.join(map(str,[blockID,ii+1,shape, shapeOri, stimType, trig,waitTime[0]]))
+        # re-code the stimType: CS+ =1; CS- =0;
+        if stimType == 'CS+':
+            stimCS = 1
+        elif stimType == 'CS-':
+            stimCS = 0
+        # ['Session','Block','blockType', 'trialOrd', 'shape', 'stimType', 'trig','waitTime','startTime','endTime','ITI']
+        curLine = ','.join(map(str,[sessID,blockID,ii+1,shape, stimCS, trig,waitTime[0],T_s,T_end,ITI_c]))
         resultRec.write(curLine)
         resultRec.write('\n')
         resultRec.close()
@@ -395,39 +457,40 @@ def run_block(blockID,trialList,trialFile):
     win.flip()
     core.wait(1)
     win.flip()
-    if blockID == 4:
-        cs1Rating = csRatings(blockID,"tr_ratings",'tr')         # rating the shape square
-        cs2rating = csRatings(blockID,"ci_ratings",'ci')         # rating the ro
+    #                     sessID,blockID,blockFile,name, shape,blockType,randCond
+    cs1Rating = csRatings(sessID,block,blockFile,"tr_ratings",'tr',blockType,Cond)         # rating the shape square
+    cs2rating = csRatings(sessID,block,blockFile,"ci_ratings",'ci',blockType,Cond)         # rating the ro
 
-#### real experiemnt starts here.
-# define block params.
-blocks = [['NR','NR'],
-          ['NR','NR']]
-# define trial params.
-# randomize the CS+, CS- based on pseudo random order
-randCond = pseudorand[expInfo['participantID']]
-if randCond == '1':   # judge the condition
-    print('random order 1')
-#              shape, orient, stimType, trigger
-    CSplus_1 = ['ci', 1,  'CS+', 2] # CS+ with shocks
-    CSplus_2 = ['ci', 1,  'CS+', 3]
-    CSminus  = ['tr', 0, 'CS-', 4]
-else:
-    print('random roder 2')
-#    trials = [['ro', 45,  'CS+', 2],
-    CSminus =  ['ci', 1, 'CS-', 4]
-    CSplus_1 = ['tr', 0, 'CS+', 2] # CS+ with shocks
-    CSplus_2 = ['tr', 0, 'CS+', 3]
+# short break between blocks
+    if sessID == 1 and blockID == 3:                                        # if at the end of the experiment
+        imName = _thisDir + os.sep + 'stim' + os.sep + 'fixation.jpg'
+        waitDur = 3
+    else:
+        imName = _thisDir + os.sep + 'stim' + os.sep + 'pause_s.jpg'
+        waitDur = 10
+        
+    showImage = visual.ImageStim(win, image=imName,pos=[0, 0])
+    escDown = None
+    timer = core.Clock()
+    timer.add(waitDur)
+    while timer.getTime() < 0 and escDown is None:
+        escDown = get_keypress()
+        if escDown is not None:
+            shutdown()
+        showImage.draw()
+        win.flip()       # present the instruction for resting
 
+
+
+################################# The Real experiemnt starts here ##################################################
 # show the instructions
 text_msg("Das Experiment beginnt jetzt.", (0, 0),30)
 win.flip()
 
 event.waitKeys(maxWait=20.0,keyList=['space']) # wait for participants' response to proceed
-#core.wait(1)
 
 # show the instructed fear
-if randCond == 1:
+if randCond == '1':
     imName = _thisDir + os.sep + 'stim' + os.sep + 'd2_cond1_s.jpg'
 else:
     imName = _thisDir + os.sep + 'stim' + os.sep + 'd2_cond2_s.jpg'
@@ -436,37 +499,60 @@ showImage = visual.ImageStim(win, image=imName,pos=[0, 0])
 showImage.draw()
 win.flip()
 
-event.waitKeys(maxWait=10.0,keyList=['space']) # wait for participants' response to proceed
-send_code(1)   # start of the experiment, send two codes
+event.waitKeys(maxWait=20.0,keyList=['space']) # wait for participants' response to proceed
 
-twoShockId = random.choice([2,3]) # random choose a block for two shocks
+twoShockId = random.choice([1,2])              # random choose a block for two shocks
 
-for ii in range(4):
-    # SessID = ii
-#    curSess = blocks[ii]
-    #print('Session: ', SessID)
-    #for jj in range(len(curSess)):
-    blockID = ii + 1
-    #curBlock = curSess[jj]
-    print('blockID:', blockID,)
-    if blockID == twoShockId:
-        print('block 2 will have two shocks')
-        trials = [CSplus_1]+[CSplus_2]*2+[CSminus]*2
-    else:
-        print('block 3 will have two shocks')
-        trials = [CSplus_1]+[CSplus_2]*2+[CSminus]*2
-    run_block(blockID,trials,trialFilename)
+send_code(1)                                   # start of the experiment, send two codes
+T0 = core.getTime()                            # get the time of experiment started
 
-    # show the instructions for the first two sessions
-    #if ii < len(blocks) -1:
-    #    text_msg("Machen Sie eine kurze Pause von 30 Sekunden", [0,0],30)
-    #    win.flip()       # present the instruction for resting
-    #    core.wait(30)     # wait for 30 seconds
+for ii in range(len(blocks)):
+    SessID = ii + 1
+    curSess = blocks[ii]
+    # print('Session: ', SessID)
+
+    for jj in range(len(curSess)):
+        blockID = jj + 1
+        curBlock = curSess[jj]
+        #print('blockType:',curBlock, 'blockID:', blockID,)
+        
+        if twoShockId == 1:
+            # print('Session 1 block 2 will have two shocks')
+            #twoShockSes = 1
+            twoShockBlock = 1
+        else:
+            # print('Session 2 block 1 will have two shocks')
+            #twoShockSes = 2
+            twoShockBlock = 2
+
+        if blockID == twoShockBlock:
+            trials = [CSplus_1]*2+[CSplus_2]*4+[CSminus]*4
+        else:
+            trials = [CSplus_1]+[CSplus_2]*4+[CSminus]*4
+        #         sessID,block,blockType,trialList,trialFile,blockFile,Cond, startTime
+        run_block(SessID, blockID, curBlock,trials,trialFilename,blockFilename,randCond, T0)
+
+    # pause between blocks
+    # if ii < len(blocks) -1:
+    #    imName = _thisDir + os.sep + 'stim' + os.sep + 'pause_s.jpg'
+    #    showImage = visual.ImageStim(win, image=imName,pos=[0, 0])
+    #    escDown = None
+    #    timer = core.Clock()
+    #    timer.add(10)
+    #    while timer.getTime() < 0 and escDown is None:
+    #        escDown = get_keypress()
+    #        if escDown is not None:
+    #            shutdown()
+    #        showImage.draw()
+    #        win.flip()       # present the instruction for resting
 
 # show thanks and goodbye
+send_code(1)                          # End of the experiment, send two codes
 text_msg("Vielen Dank", [0, 0],50)
 win.flip()
 core.wait(1)
 
+T_end = core.getTime()                            # get the time of experiment started
+print(T_end - T0)
 # exit
 shutdown()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-This is an the script for the pilot study.
+This is an the script for the pilot study (two-day).
 
 Author      Date           log of changes
 =========   =============  ======================
@@ -22,17 +22,13 @@ the Bio-pac
 @author: Chuan-Peng Hu, PhD, Neuroimaging Center, Mainz
 @email: hcp4715 at gmail dot com
 """
-# from __future__ import absolute_import, division
 import psychopy
 import wx, os, time, sys,csv
 from psychopy import parallel, locale_setup, sound, gui, visual, core, data, event, logging, clock
 from psychopy.constants import (NOT_STARTED, STARTED, PLAYING, PAUSED,
                                 STOPPED, FINISHED, PRESSED, RELEASED, FOREVER)
-#from psychopy.iohub.client import launchHubServer, EventConstants
 
 import numpy as np  # whole numpy lib is available, prepend 'np.'
-#from numpy import (sin, cos, tan, log, log10, pi, average,
-#                   sqrt, std, deg2rad, rad2deg, linspace, asarray)
 from numpy.random import random, randint, normal, shuffle  # Note here that we used the numpy.random module
 from itertools import groupby
 import random
